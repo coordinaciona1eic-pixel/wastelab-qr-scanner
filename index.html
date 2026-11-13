@@ -1,244 +1,100 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1">
-
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>WasteLab QR | Lector en vivo</title>
-
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-
   <style>
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      background: #10283c;
-      color: white;
-      font-family: system-ui, Arial, sans-serif;
-    }
-
-    .app {
-      width: 100%;
-      max-width: 560px;
-      min-height: 100vh;
-      margin: auto;
-      padding: 24px 18px;
-      text-align: center;
-    }
-
-    h1 {
-      margin: 10px 0 5px;
-      font-size: 28px;
-    }
-
-    p {
-      color: #bdd0dd;
-      font-size: 14px;
-      line-height: 1.6;
-    }
-
-    #reader {
-      width: 100%;
-      margin: 22px auto;
-      border-radius: 16px;
-      overflow: hidden;
-      background: #203b51;
-    }
-
-    button {
-      width: 100%;
-      padding: 15px;
-      border: 0;
-      border-radius: 12px;
-      background: #278bb7;
-      color: white;
-      font-size: 15px;
-      font-weight: bold;
-      cursor: pointer;
-    }
-
-    button:disabled {
-      opacity: 0.5;
-    }
-
-    #status {
-      margin-top: 20px;
-      padding: 16px;
-      background: #24445b;
-      border-radius: 12px;
-      font-size: 13px;
-      line-height: 1.6;
-      overflow-wrap: anywhere;
-    }
-
-    .hint {
-      font-size: 12px;
-      color: #9bb9ca;
-      margin-top: 20px;
-    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #10283c; color: white; font-family: system-ui, Arial, sans-serif; }
+    .app { width: 100%; max-width: 560px; min-height: 100vh; margin: auto; padding: 24px 18px; text-align: center; }
+    h1 { margin: 10px 0 5px; font-size: 28px; }
+    p { color: #bdd0dd; font-size: 14px; line-height: 1.6; }
+    #reader { width: 100%; margin: 22px auto; border-radius: 16px; overflow: hidden; background: #203b51; }
+    button { width: 100%; padding: 15px; border: 0; border-radius: 12px; background: #278bb7; color: white; font-size: 15px; font-weight: bold; cursor: pointer; }
+    button:disabled { opacity: 0.5; }
+    #status { margin-top: 20px; padding: 16px; background: #24445b; border-radius: 12px; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+    .hint { font-size: 12px; color: #9bb9ca; margin-top: 20px; }
   </style>
 </head>
-
 <body>
-
   <main class="app">
-
     <h1>▦ WasteLab QR</h1>
-
-    <p>
-      Escáner de recipientes en tiempo real
-    </p>
-
+    <p>Escáner de recipientes en tiempo real</p>
     <div id="reader"></div>
-
-    <button id="start" onclick="startScanner()">
-      Abrir cámara
-    </button>
-
-    <div id="status" aria-live="polite">
-      Presiona Abrir cámara para comenzar.
-    </div>
-
-    <p class="hint">
-      Apunta al código QR del recipiente.
-      No necesitas tomar fotografías.
-    </p>
-
+    <button id="start" onclick="startScanner()">Abrir cámara</button>
+    <div id="status" aria-live="polite">Presiona Abrir cámara para comenzar.</div>
+    <p class="hint">Apunta al código QR del recipiente. No necesitas tomar fotografías.</p>
   </main>
-
   <script>
+    // URL existente: NO modificar; mantiene el escáner administrativo.
+    const ADMIN_URL = "https://script.google.com/macros/s/AKfycbwlkc5_boSwOjyrAeclElWrTa1KnGy4LBLu107uMa6M9Urx-DCsBMW9uBWP7Z6zqRqEtg/exec";
 
-    // PEGA AQUÍ LA URL /exec DE WASTELAB QR.
-    const APP_URL = "https://script.google.com/macros/s/AKfycbwlkc5_boSwOjyrAeclElWrTa1KnGy4LBLu107uMa6M9Urx-DCsBMW9uBWP7Z6zqRqEtg/exec";
+    // REEMPLAZAR por la URL /exec de la implementación del PORTAL DE ALUMNOS.
+    const ALUMNOS_URL = "https://script.google.com/macros/s/AKfycbzvm_aYdkIIHcAnYRNI7I1TR6QzhWrgIcZI1cSe5tvcrKZl6zcZ2xoFOBvV0wXA1KA2/exec";
+
+    // https://.../wastelab-qr-scanner/              => administrativo (actual)
+    // https://.../wastelab-qr-scanner/?app=alumnos  => alumnos/profesores
+    const portal = new URLSearchParams(window.location.search).get("app") === "alumnos"
+      ? "alumnos" : "admin";
+    const APP_URL = portal === "alumnos" ? ALUMNOS_URL : ADMIN_URL;
 
     let scanner = null;
     let completed = false;
-
-    const statusBox =
-      document.getElementById("status");
-
-    const startButton =
-      document.getElementById("start");
+    const statusBox = document.getElementById("status");
+    const startButton = document.getElementById("start");
 
     async function startScanner() {
-
-      if (
-        !APP_URL.startsWith(
-          "https://script.google.com/macros/s/"
-        )
-      ) {
-        statusBox.textContent =
-          "Falta configurar la dirección de WasteLab QR.";
+      if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:\?.*)?$/.test(APP_URL)) {
+        statusBox.textContent = portal === "alumnos"
+          ? "Falta colocar la URL /exec del portal de alumnos en ALUMNOS_URL."
+          : "Falta configurar la dirección de WasteLab QR.";
         return;
       }
-
       if (typeof Html5Qrcode === "undefined") {
-        statusBox.textContent =
-          "No se cargó la biblioteca de lectura QR.";
+        statusBox.textContent = "No se cargó la biblioteca de lectura QR.";
         return;
       }
-
-      if (scanner) {
-        return;
-      }
-
+      if (scanner) return;
       completed = false;
       startButton.disabled = true;
-
-      statusBox.textContent =
-        "Solicitando acceso a la cámara...";
+      statusBox.textContent = "Solicitando acceso a la cámara...";
 
       try {
-
         scanner = new Html5Qrcode("reader");
-
         await scanner.start(
-          {
-            facingMode: "environment"
-          },
-          {
-            fps: 12,
-            qrbox: function(width, height) {
-
-              const side = Math.max(
-                80,
-                Math.floor(
-                  Math.min(width, height, 280) * 0.85
-                )
-              );
-
-              return {
-                width: side,
-                height: side
-              };
-            }
-          },
-          async function(decodedText) {
-
+          { facingMode: "environment" },
+          { fps: 12, qrbox: function (width, height) {
+            const side = Math.max(80, Math.floor(Math.min(width, height, 280) * 0.85));
+            return { width: side, height: side };
+          } },
+          async function (decodedText) {
             if (completed) return;
-
-            const code =
-              String(decodedText || "").trim();
-
-            const valid =
-              code.startsWith("WLQR:") ||
-              /^WQR-[A-Z0-9-]+$/.test(code);
-
+            const code = String(decodedText || "").trim();
+            const valid = code.startsWith("WLQR:") || /^WQR-[A-Z0-9-]+$/.test(code);
             if (!valid) {
-              statusBox.textContent =
-                "QR detectado, pero no pertenece a WasteLab.";
+              statusBox.textContent = "QR detectado, pero no pertenece a WasteLab.";
               return;
             }
-
             completed = true;
-
-            statusBox.textContent =
-              "QR reconocido. Abriendo ficha...";
-
-            try {
-              await scanner.stop();
-            } catch (error) {
-              console.warn(error);
-            }
-
+            statusBox.textContent = "QR reconocido. Regresando al portal...";
+            try { await scanner.stop(); } catch (error) { console.warn(error); }
             const destination = new URL(APP_URL);
-
-            destination.searchParams.set(
-              "qr",
-              code
-            );
-
-            window.location.replace(
-              destination.toString()
-            );
+            destination.searchParams.set("qr", code);
+            window.location.replace(destination.toString());
           },
-          function() {
-            // Continuar escaneando.
-          }
+          function () { /* continuar escaneando */ }
         );
-
-        statusBox.textContent =
-          "Cámara activa. Apunta al QR.";
-
+        statusBox.textContent = "Cámara activa. Apunta al QR.";
       } catch (error) {
-
         console.error(error);
-
         scanner = null;
         completed = false;
         startButton.disabled = false;
-
-        statusBox.textContent =
-          "No se pudo iniciar la cámara: " +
-          (error.message || String(error));
+        statusBox.textContent = "No se pudo iniciar la cámara: " + (error.message || String(error));
       }
     }
-
   </script>
 </body>
 </html>
